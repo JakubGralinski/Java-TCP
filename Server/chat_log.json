@@ -1,0 +1,104 @@
+[
+    {
+        "broadcast": true,
+        "sender": "Server",
+        "message": "User K has joined the chat.",
+        "timestamp": 1732116672645
+    },
+    {
+        "broadcast": true,
+        "sender": "K",
+        "message": "K: /msg <k> <k>",
+        "timestamp": 1732116687032
+    },
+    {
+        "broadcast": true,
+        "sender": "Server",
+        "message": "User koba has joined the chat.",
+        "timestamp": 1732116704024
+    },
+    {
+        "broadcast": true,
+        "sender": "koba",
+        "message": "koba: k",
+        "timestamp": 1732116707226
+    },
+    {
+        "broadcast": true,
+        "sender": "koba",
+        "message": "koba: spam",
+        "timestamp": 1732116710018
+    },
+    {
+        "broadcast": true,
+        "sender": "Server",
+        "message": "User koba has disconnected.",
+        "timestamp": 1732116712913
+    },
+    {
+        "broadcast": true,
+        "sender": "Server",
+        "message": "User koba has disconnected.",
+        "timestamp": 1732116712917
+    },
+    {
+        "broadcast": true,
+        "sender": "Server",
+        "message": "User koba has disconnected.",
+        "timestamp": 1732116712920
+    },
+    {
+        "broadcast": true,
+        "sender": "Server",
+        "message": "User Kuba has joined the chat.",
+        "timestamp": 1732117908686
+    },
+    {
+        "broadcast": true,
+        "sender": "Kuba",
+        "message": "Kuba: m",
+        "timestamp": 1732117913129
+    },
+    {
+        "broadcast": true,
+        "sender": "Server",
+        "message": "User Kuba has disconnected.",
+        "timestamp": 1732117917315
+    },
+    {
+        "broadcast": true,
+        "sender": "Server",
+        "message": "User Kuba has disconnected.",
+        "timestamp": 1732117917321
+    },
+    {
+        "broadcast": true,
+        "sender": "Server",
+        "message": "User Kuba has disconnected.",
+        "timestamp": 1732117917324
+    },
+    {
+        "broadcast": true,
+        "sender": "Server",
+        "message": "User KUBA has joined the chat.",
+        "timestamp": 1732118234055
+    },
+    {
+        "broadcast": true,
+        "sender": "Server",
+        "message": "User K has joined the chat.",
+        "timestamp": 1732118531805
+    },
+    {
+        "broadcast": false,
+        "sender": "K -> K",
+        "message": "KKK",
+        "timestamp": 1732118545702
+    },
+    {
+        "broadcast": true,
+        "sender": "K",
+        "message": "K: koo",
+        "timestamp": 1732118579667
+    }
+]

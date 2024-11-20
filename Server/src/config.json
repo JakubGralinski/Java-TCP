@@ -1,0 +1,9 @@
+{
+  "port": 1234,
+  "serverName": "ChatServer",
+  "bannedPhrases": [
+    "spam",
+    "; DROP *;",
+    "rm -rf *"
+  ]
+}
