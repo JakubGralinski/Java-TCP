@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class Server {
@@ -17,7 +18,9 @@ public class Server {
     private List<String> bannedPhrases;
     private List<ClientHandler> connectedClients = new ArrayList<>();
 
-    public Server(String configFilePath) throws IOException {
+    public static final String configFilePath = "src/config.json";
+
+    public Server() throws IOException {
         try (FileReader configLoader = new FileReader(configFilePath)) {
             JSONTokener tokener = new JSONTokener(configLoader);
             JSONObject config = new JSONObject(tokener);
@@ -41,11 +44,22 @@ public class Server {
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println(serverName + " running on port: " + port);
 
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
-                System.out.println("New client connected: " + clientSocket.getInetAddress());
-                ClientHandler clientHandler = new ClientHandler(clientSocket, this);
-                new Thread(clientHandler).start();
+            try (FileReader configLoader = new FileReader(configFilePath)) {
+                JSONTokener tokener = new JSONTokener(configLoader);
+                JSONObject config = new JSONObject(tokener);
+                int numberOfClients = config.getInt("numberOfClients");
+
+                for (int i = 0; i < numberOfClients; i++) {
+                    try {
+                    Socket clientSocket = serverSocket.accept();
+                    System.out.println("New client connected: " + clientSocket.getInetAddress());
+                    ClientHandler clientHandler = new ClientHandler(clientSocket, this);
+                    new Thread(clientHandler).start();
+                    }
+                    catch(Exception _){
+                        System.out.println("Too many client connections: " + numberOfClients);
+                    }
+                }
             }
         } catch (IOException e) {
             System.err.println("Server error: " + e.getMessage());
@@ -58,7 +72,7 @@ public class Server {
 
     public synchronized void broadcastMessage(String message, ClientHandler sender) {
         String senderNickname = (sender != null) ? sender.nickname : "Server";
-        logMessage(message, senderNickname, true);
+        //logMessage(message, senderNickname, true);
 
         for (ClientHandler client : connectedClients) {
             if (client != sender) {
@@ -76,7 +90,7 @@ public class Server {
     public synchronized void removeClient(ClientHandler clientHandler) {
         connectedClients.remove(clientHandler);
         broadcastMessage("User " + clientHandler.nickname + " has disconnected.", null);
-        logMessage("User " + clientHandler.nickname + " has disconnected.", "Server", true);
+        //logMessage("User " + clientHandler.nickname + " has disconnected.", "Server", true);
         System.out.println("Client " + clientHandler.nickname + " disconnected. Total clients: " + connectedClients.size());
     }
 
@@ -93,7 +107,7 @@ public class Server {
         for (ClientHandler client : connectedClients) {
             if (client.nickname.equalsIgnoreCase(recipientNickname)) {
                 client.sendMessage("(Private) " + senderNickname + ": " + message);
-                logMessage(message, senderNickname + " -> " + recipientNickname, false); // Log private message
+                //logMessage(message, senderNickname + " -> " + recipientNickname, false);
                 return;
             }
         }
@@ -119,8 +133,31 @@ public class Server {
 
         requester.sendMessage(clientList.toString());
     }
+    public synchronized void sendMessageToMultipleClients(String senderNickname, String[] recipients, String message) {
+        for (String recipient : recipients) {
+            boolean found = false;
+            for (ClientHandler client : connectedClients) {
+                if (client.nickname.equalsIgnoreCase(recipient.trim())) {
+                    client.sendMessage("(Group) " + senderNickname + ": " + message);
+                    found = true;
+                }
+            }
+            if (!found) {
+                sendPrivateMessage(senderNickname, recipient.trim(), "User not found in group message.");
+            }
+        }
+    }
 
-    private synchronized void logMessage(String message, String sender, boolean isBroadcast) {
+    public synchronized void broadcastMessageExcluding(String senderNickname, String[] exclusions, String message) {
+        List<String> excludedList = Arrays.asList(exclusions);
+        for (ClientHandler client : connectedClients) {
+            if (!excludedList.contains(client.nickname)) {
+                client.sendMessage("(Excluded) " + senderNickname + ": " + message);
+            }
+        }
+    }
+
+    /*private synchronized void logMessage(String message, String sender, boolean isBroadcast) {
         try {
             File logFile = new File("chat_log.json");
             JSONArray logArray;
@@ -147,5 +184,5 @@ public class Server {
         } catch (IOException e) {
             System.err.println("Error writing to log file: " + e.getMessage());
         }
-    }
+    }*/
 }
