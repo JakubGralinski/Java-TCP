@@ -10,15 +10,24 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class Server {
     private int port;
+
     String serverName;
+
     private List<String> bannedPhrases;
     private List<ClientHandler> connectedClients = new ArrayList<>();
 
+    private ServerGUI gui;
+
     public static final String configFilePath = "src/config.json";
+
+    public void setGui(ServerGUI gui) {
+        this.gui = gui;
+    }
 
     public Server() throws IOException {
         try (FileReader configLoader = new FileReader(configFilePath)) {
@@ -76,22 +85,37 @@ public class Server {
 
         for (ClientHandler client : connectedClients) {
             if (client != sender) {
-                client.sendMessage(message);
+                client.sendMessage("[All] " + senderNickname + ": " + message);
             }
         }
     }
 
+
     public synchronized void addClient(ClientHandler clientHandler) {
         connectedClients.add(clientHandler);
+        String logMessage = "Client " + clientHandler.nickname + " connected. Total clients: " + connectedClients.size();
         broadcastMessage("User " + clientHandler.nickname + " has joined the chat.", null);
-        System.out.println("Client " + clientHandler.nickname + " connected. Total clients: " + connectedClients.size());
+
+        System.out.println(logMessage);
+        if (gui != null) gui.appendLog(logMessage);
+        if (gui != null) gui.updateClientList(connectedClients.stream()
+                .map(client -> client.nickname)
+                .toList());
+        updateAllClients();
     }
 
     public synchronized void removeClient(ClientHandler clientHandler) {
         connectedClients.remove(clientHandler);
+        String logMessage = "Client " + clientHandler.nickname + " disconnected. Total clients: " + connectedClients.size();
         broadcastMessage("User " + clientHandler.nickname + " has disconnected.", null);
         //logMessage("User " + clientHandler.nickname + " has disconnected.", "Server", true);
-        System.out.println("Client " + clientHandler.nickname + " disconnected. Total clients: " + connectedClients.size());
+
+        System.out.println(logMessage);
+        if (gui != null) gui.appendLog(logMessage);
+        if (gui != null) gui.updateClientList(connectedClients.stream()
+                .map(client -> client.nickname)
+                .toList());
+        updateAllClients();
     }
 
     public synchronized boolean isNicknameTaken(String nickname) {
@@ -104,19 +128,32 @@ public class Server {
     }
 
     public synchronized void sendPrivateMessage(String senderNickname, String recipientNickname, String message) {
+        boolean recipentFound = false;
+        String recipentName="";
         for (ClientHandler client : connectedClients) {
             if (client.nickname.equalsIgnoreCase(recipientNickname)) {
-                client.sendMessage("(Private) " + senderNickname + ": " + message);
-                //logMessage(message, senderNickname + " -> " + recipientNickname, false);
-                return;
+                client.sendMessage("[Private] " + senderNickname + " -> " + recipientNickname + ": " +message);
+                recipentFound = true;
+                recipentName = client.nickname;
             }
         }
-        // Notify the sender if the recipient was not found
-        for (ClientHandler client : connectedClients) {
-            if (client.nickname.equalsIgnoreCase(senderNickname)) {
-                client.sendMessage("User " + recipientNickname + " not found.");
+        if(recipentFound){
+            for (ClientHandler client : connectedClients) {
+                if(client.nickname.equalsIgnoreCase(recipientNickname)) break;
+                if (client.nickname.equalsIgnoreCase(senderNickname)) {
+                    client.sendMessage("[Private] " + senderNickname + " -> " + recipientNickname + ": " +message);
+                    break;
+                }
+            }
+        }else{
+            for (ClientHandler client : connectedClients) {
+                if (client.nickname.equalsIgnoreCase(senderNickname)) {
+                    client.sendMessage("User " + recipientNickname + " not found.");
+                    break;
+                }
             }
         }
+
     }
 
     public synchronized void sendConnectedClients(ClientHandler requester) {
@@ -124,14 +161,29 @@ public class Server {
         for (ClientHandler client : connectedClients) {
             clientList.append(client.nickname).append(", ");
         }
-
         if (clientList.length() > 19) { // Length of "Connected clients: "
+            clientList.setLength(clientList.length() - 2); // Remove trailing ", "
+        } else {
+            clientList.append("None");
+        }
+        requester.sendMessage(clientList.toString());
+    }
+
+    private synchronized void updateAllClients() {
+        StringBuilder clientList = new StringBuilder("Connected clients: ");
+        for (ClientHandler client : connectedClients) {
+            clientList.append(client.nickname).append(", ");
+        }
+        if (clientList.length() > 19) {
             clientList.setLength(clientList.length() - 2);
         } else {
             clientList.append("None");
         }
 
-        requester.sendMessage(clientList.toString());
+        String clientListMessage = clientList.toString();
+        for (ClientHandler client : connectedClients) {
+            client.sendMessage(clientListMessage);
+        }
     }
     public synchronized void sendMessageToMultipleClients(String senderNickname, String[] recipients, String message) {
         for (String recipient : recipients) {

@@ -2,7 +2,7 @@ import java.io.*;
 import java.net.Socket;
 
 public class ClientHandler implements Runnable {
-    Socket clientSocket;
+    private Socket clientSocket;
     private Server server;
     private PrintWriter out;
     private BufferedReader in;
@@ -23,85 +23,66 @@ public class ClientHandler implements Runnable {
     @Override
     public void run() {
         try {
+            // Handle nickname setup
             while (true) {
                 nickname = in.readLine();
-                if (server.isNicknameTaken(nickname)) {
+                if (nickname == null || nickname.isBlank()) {
+                    out.println("Nickname cannot be blank. Please enter a valid nickname:");
+                } else if (server.isNicknameTaken(nickname)) {
                     out.println("Nickname already taken. Please choose a different nickname:");
                 } else {
-                    server.addClient(this);
+                    server.addClient(this); // Register client with the server
                     break;
                 }
             }
 
+            // Main message-handling loop
             String message;
             while ((message = in.readLine()) != null) {
                 if (isInBannedPhrases(message)) {
                     out.println("Your message contains a banned phrase and was not sent.");
-                    continue; // Skip processing the message further
+                    continue; // Skip further processing
                 }
-                switch (message.toLowerCase()) {
-                    case "/clients":
-                        server.sendConnectedClients(this);
-                        break;
 
-                    case "/msg":
-                        String[] msgParts = message.split(" ", 2); // Extract recipient and message
-                        if (msgParts.length == 2) {
-                            String recipientNickname = msgParts[0];
-                            String privateMessage = msgParts[1];
-                            server.sendPrivateMessage(nickname, recipientNickname, privateMessage);
-                        } else {
-                            out.println("Usage: /msg <recipient> <message>");
-                        }
-                        break;
-
-                    case "/multi":
-                        String[] multiParts = message.split(" ", 2); // Extract recipients and message
-                        if (multiParts.length == 2) {
-                            String[] recipients = multiParts[0].split(","); // List of recipients
-                            String multiMessage = multiParts[1];
-                            server.sendMessageToMultipleClients(nickname, recipients, multiMessage);
-                        } else {
-                            out.println("Usage: /multi <recipient1>,<recipient2>,... <message>");
-                        }
-                        break;
-
-                    case "/exclude":
-                        String[] excludeParts = message.split(" ", 2); // Extract exclusions and message
-                        if (excludeParts.length == 2) {
-                            String[] exclusions = excludeParts[0].split(","); // List of exclusions
-                            String excludeMessage = excludeParts[1];
-                            server.broadcastMessageExcluding(nickname, exclusions, excludeMessage);
-                        } else {
-                            out.println("Usage: /exclude <nickname1>,<nickname2>,... <message>");
-                        }
-                        break;
-
-                    case "/banned":
-                        String bannedList = String.join(", ", server.getBannedPhrases());
-                        out.println("Banned phrases: " + bannedList);
-                        break;
-
-                    default:
-                        // Broadcast message if no command is matched
-                        server.broadcastMessage(nickname + ": " + message, this);
-                        break;
+                if (message.startsWith("/clients")) {
+                    server.sendConnectedClients(this); // Send the updated client list
+                } else if (message.startsWith("/banned")) {
+                    sendBannedPhrases(); // Send the list of banned phrases
+                } else if (message.startsWith("/msg ")) {
+                    handlePrivateMessage(message);
+                } else {
+                    server.broadcastMessage(nickname + ": " + message, this);
                 }
             }
         } catch (IOException e) {
-            System.err.println("Client disconnected.");
+            System.err.println("Client disconnected: " + nickname);
         } finally {
             server.removeClient(this);
             server.broadcastMessage("User " + nickname + " has disconnected.", null);
-
-            try {
-                clientSocket.close();
-            } catch (IOException e) {
-                System.err.println("Error closing client socket: " + e.getMessage());
-            }
+            closeConnection();
         }
     }
 
+    private void sendBannedPhrases() {
+        String bannedList = "Banned phrases: " + String.join(", ", server.getBannedPhrases());
+        sendMessage(bannedList);
+    }
+
+    // Helper method to handle private messages
+    private void handlePrivateMessage(String message) {
+        String[] parts = message.split(" ", 3);
+        if (parts.length < 3) {
+            out.println("Usage: /msg <recipient> <message>");
+            return;
+        }
+
+        String recipientNickname = parts[1];
+        String privateMessage = parts[2];
+
+        server.sendPrivateMessage(nickname, recipientNickname, privateMessage);
+    }
+
+    // Check for banned phrases
     private boolean isInBannedPhrases(String message) {
         for (String phrase : server.getBannedPhrases()) {
             if (message.toLowerCase().contains(phrase.toLowerCase())) {
@@ -111,7 +92,17 @@ public class ClientHandler implements Runnable {
         return false;
     }
 
+    // Send a message to this client
     public void sendMessage(String message) {
         out.println(message);
+    }
+
+    // Close client socket
+    private void closeConnection() {
+        try {
+            clientSocket.close();
+        } catch (IOException e) {
+            System.err.println("Error closing client socket: " + e.getMessage());
+        }
     }
 }
