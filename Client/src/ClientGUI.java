@@ -2,16 +2,17 @@ import javax.swing.*;
 import java.awt.*;
 import java.io.*;
 import java.net.Socket;
+import java.util.List;
 
 public class ClientGUI {
     private JFrame frame;
     private JTextArea chatArea;
     private JTextField messageField;
     private JButton sendButton, clientsButton, bannedButton;
-    private JComboBox<String> recipientBox; // Dropdown for recipients
+    private JList<String> recipientList; // List for recipients
+    private DefaultListModel<String> recipientListModel;
 
     private PrintWriter out;
-    private DefaultComboBoxModel<String> recipientModel;
 
     public ClientGUI(Socket socket) {
         try {
@@ -34,10 +35,16 @@ public class ClientGUI {
             sendButton = new JButton("Send");
             sendButton.addActionListener(e -> sendMessage());
 
-            // Dropdown for recipient selection
-            recipientModel = new DefaultComboBoxModel<>();
-            recipientBox = new JComboBox<>(recipientModel);
-            recipientBox.addItem("All"); // Default option to send to all clients
+            // Recipient list
+            recipientListModel = new DefaultListModel<>();
+            recipientList = new JList<>(recipientListModel);
+            recipientList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+            recipientList.setVisibleRowCount(3);
+            JScrollPane recipientScrollPane = new JScrollPane(recipientList);
+            recipientScrollPane.setPreferredSize(new Dimension(150, 80));
+
+            // Add "All" option to the recipient list
+            recipientListModel.addElement("All");
 
             // Command buttons
             clientsButton = new JButton("List Clients");
@@ -48,7 +55,7 @@ public class ClientGUI {
 
             // Layout setup
             JPanel inputPanel = new JPanel(new BorderLayout());
-            inputPanel.add(recipientBox, BorderLayout.WEST); // Add recipient dropdown
+            inputPanel.add(recipientScrollPane, BorderLayout.WEST); // Add recipient list
             inputPanel.add(messageField, BorderLayout.CENTER);
             inputPanel.add(sendButton, BorderLayout.EAST);
 
@@ -70,7 +77,7 @@ public class ClientGUI {
                     while ((serverMessage = in.readLine()) != null) {
                         appendMessage(serverMessage);
 
-                        // Update the dropdown list when a client list update is received
+                        // Update the recipient list when a client list update is received
                         if (serverMessage.startsWith("Connected clients: ")) {
                             updateRecipientList(serverMessage);
                         }
@@ -86,15 +93,21 @@ public class ClientGUI {
     }
 
     private void sendMessage() {
-        String message = messageField.getText();
+        String message = messageField.getText().trim();
         if (!message.isEmpty()) {
-            String selectedRecipient = (String) recipientBox.getSelectedItem();
-            if (selectedRecipient.equals("All")) {
-                out.println(message); // Send to all
+            // Get selected recipients
+            List<String> selectedRecipients = recipientList.getSelectedValuesList();
+            if (selectedRecipients.isEmpty() || selectedRecipients.contains("All")) {
+                // Broadcast if "All" is selected or no recipient is selected
+                out.println(message);
             } else {
-                out.println("/msg " + selectedRecipient + " " + message); // Send private message
+                // Build the recipient string
+                String recipientsStr = String.join(",", selectedRecipients);
+
+                // Send to specific users
+                out.println("/" + recipientsStr + " " + message);
             }
-            messageField.setText("");
+            messageField.setText(""); // Clear the input field
         }
     }
 
@@ -106,31 +119,37 @@ public class ClientGUI {
         chatArea.append(message + "\n");
 
         if (message.startsWith("Connected clients: ")) {
-            updateRecipientList(message); // Update dropdown with clients
+            updateRecipientList(message); // Update recipient list
         } else if (message.startsWith("Banned phrases: ")) {
             JOptionPane.showMessageDialog(frame, message, "Banned Phrases", JOptionPane.INFORMATION_MESSAGE);
         }
     }
 
-    // Parse and update the recipient dropdown
     private void updateRecipientList(String clientListMessage) {
         SwingUtilities.invokeLater(() -> {
-            recipientModel.removeAllElements(); // Clear the existing list
-            recipientModel.addElement("All");  // Default option to broadcast
+            String previouslySelected = recipientList.getSelectedValue();
+
+            recipientListModel.clear(); // Clear the existing list
+            recipientListModel.addElement("All"); // Ensure "All" remains in the list
 
             String clientList = clientListMessage.replace("Connected clients: ", "").trim();
             if (!clientList.equals("None")) {
                 String[] clients = clientList.split(", ");
                 for (String client : clients) {
-                    recipientModel.addElement(client); // Add each client to the dropdown
+                    recipientListModel.addElement(client); // Add each client to the list
                 }
+            }
+
+            // Re-select previously selected item if it exists
+            if (previouslySelected != null && recipientListModel.contains(previouslySelected)) {
+                recipientList.setSelectedValue(previouslySelected, true);
             }
         });
     }
 
     public static void main(String[] args) {
         try {
-            Socket socket = new Socket("localhost", 1234);
+            Socket socket = new Socket("localhost", 5555);
             new ClientGUI(socket);
         } catch (IOException e) {
             JOptionPane.showMessageDialog(null, "Unable to connect to the server.", "Error", JOptionPane.ERROR_MESSAGE);

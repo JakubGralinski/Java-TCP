@@ -2,20 +2,16 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
-import java.io.File;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 public class Server {
     private int port;
-
     String serverName;
 
     private List<String> bannedPhrases;
@@ -25,8 +21,26 @@ public class Server {
 
     public static final String configFilePath = "src/config.json";
 
-    public void setGui(ServerGUI gui) {
+    // Log buffer for messages before GUI is initialized
+    private List<String> logBuffer = new ArrayList<>();
+
+    public synchronized void setGui(ServerGUI gui) {
         this.gui = gui;
+        // Flush any buffered log messages to the GUI
+        for (String message : logBuffer) {
+            gui.appendLog(message);
+        }
+        logBuffer.clear();
+    }
+
+    // Unified log method
+    public synchronized void log(String message) {
+        System.out.println(message);
+        if (gui != null) {
+            gui.appendLog(message);
+        } else {
+            logBuffer.add(message);
+        }
     }
 
     public Server() throws IOException {
@@ -42,16 +56,16 @@ public class Server {
                 this.bannedPhrases.add(phrasesArray.getString(i));
             }
 
-            System.out.println("Server configuration loaded:");
-            System.out.println("Name: " + serverName);
-            System.out.println("Port: " + port);
-            System.out.println("Banned Phrases: " + bannedPhrases);
+            log("Server configuration loaded");
+            log("Name: " + serverName);
+            log("Port: " + port);
+            log("Banned Phrases: " + bannedPhrases);
         }
     }
 
     public void run() {
         try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println(serverName + " running on port: " + port);
+            log(serverName + " running on port: " + port);
 
             try (FileReader configLoader = new FileReader(configFilePath)) {
                 JSONTokener tokener = new JSONTokener(configLoader);
@@ -60,18 +74,17 @@ public class Server {
 
                 for (int i = 0; i < numberOfClients; i++) {
                     try {
-                    Socket clientSocket = serverSocket.accept();
-                    System.out.println("New client connected: " + clientSocket.getInetAddress());
-                    ClientHandler clientHandler = new ClientHandler(clientSocket, this);
-                    new Thread(clientHandler).start();
-                    }
-                    catch(Exception _){
-                        System.out.println("Too many client connections: " + numberOfClients);
+                        Socket clientSocket = serverSocket.accept();
+                        log("New client connected: " + clientSocket.getInetAddress());
+                        ClientHandler clientHandler = new ClientHandler(clientSocket, this);
+                        new Thread(clientHandler).start();
+                    } catch (Exception _) {
+                        log("Too many client connections: " + numberOfClients);
                     }
                 }
             }
         } catch (IOException e) {
-            System.err.println("Server error: " + e.getMessage());
+            log("Server error: " + e.getMessage());
         }
     }
 
@@ -81,7 +94,6 @@ public class Server {
 
     public synchronized void broadcastMessage(String message, ClientHandler sender) {
         String senderNickname = (sender != null) ? sender.nickname : "Server";
-        //logMessage(message, senderNickname, true);
 
         for (ClientHandler client : connectedClients) {
             if (client != sender) {
@@ -90,14 +102,12 @@ public class Server {
         }
     }
 
-
     public synchronized void addClient(ClientHandler clientHandler) {
         connectedClients.add(clientHandler);
         String logMessage = "Client " + clientHandler.nickname + " connected. Total clients: " + connectedClients.size();
         broadcastMessage("User " + clientHandler.nickname + " has joined the chat.", null);
 
-        System.out.println(logMessage);
-        if (gui != null) gui.appendLog(logMessage);
+        log(logMessage);
         if (gui != null) gui.updateClientList(connectedClients.stream()
                 .map(client -> client.nickname)
                 .toList());
@@ -108,10 +118,8 @@ public class Server {
         connectedClients.remove(clientHandler);
         String logMessage = "Client " + clientHandler.nickname + " disconnected. Total clients: " + connectedClients.size();
         broadcastMessage("User " + clientHandler.nickname + " has disconnected.", null);
-        //logMessage("User " + clientHandler.nickname + " has disconnected.", "Server", true);
 
-        System.out.println(logMessage);
-        if (gui != null) gui.appendLog(logMessage);
+        log(logMessage);
         if (gui != null) gui.updateClientList(connectedClients.stream()
                 .map(client -> client.nickname)
                 .toList());
@@ -127,33 +135,39 @@ public class Server {
         return false;
     }
 
-    public synchronized void sendPrivateMessage(String senderNickname, String recipientNickname, String message) {
-        boolean recipentFound = false;
-        String recipentName="";
-        for (ClientHandler client : connectedClients) {
-            if (client.nickname.equalsIgnoreCase(recipientNickname)) {
-                client.sendMessage("[Private] " + senderNickname + " -> " + recipientNickname + ": " +message);
-                recipentFound = true;
-                recipentName = client.nickname;
-            }
-        }
-        if(recipentFound){
+    public synchronized void sendToMultipleClients(String senderNickname, String[] targetUsers, String message) {
+        boolean atLeastOneFound = false;
+
+        for (String target : targetUsers) {
+            boolean found = false;
             for (ClientHandler client : connectedClients) {
-                if(client.nickname.equalsIgnoreCase(recipientNickname)) break;
-                if (client.nickname.equalsIgnoreCase(senderNickname)) {
-                    client.sendMessage("[Private] " + senderNickname + " -> " + recipientNickname + ": " +message);
-                    break;
+                if (client.nickname.equalsIgnoreCase(target.trim())) {
+                    client.sendMessage("[Private] " + senderNickname + " -> " + target + ": " + message);
+                    found = true;
+                    atLeastOneFound = true;
                 }
             }
-        }else{
-            for (ClientHandler client : connectedClients) {
-                if (client.nickname.equalsIgnoreCase(senderNickname)) {
-                    client.sendMessage("User " + recipientNickname + " not found.");
-                    break;
+
+            // Notify the sender if a recipient was not found
+            if (!found) {
+                for (ClientHandler client : connectedClients) {
+                    if (client.nickname.equalsIgnoreCase(senderNickname)) {
+                        client.sendMessage("[Error] User not found: " + target);
+                        break;
+                    }
                 }
             }
         }
 
+        if (atLeastOneFound) {
+            // Notify the sender about successful message delivery
+            for (ClientHandler client : connectedClients) {
+                if (client.nickname.equalsIgnoreCase(senderNickname)) {
+                    client.sendMessage("[Private] Message sent to: " + String.join(", ", targetUsers));
+                    break;
+                }
+            }
+        }
     }
 
     public synchronized void sendConnectedClients(ClientHandler requester) {
@@ -185,29 +199,7 @@ public class Server {
             client.sendMessage(clientListMessage);
         }
     }
-    public synchronized void sendMessageToMultipleClients(String senderNickname, String[] recipients, String message) {
-        for (String recipient : recipients) {
-            boolean found = false;
-            for (ClientHandler client : connectedClients) {
-                if (client.nickname.equalsIgnoreCase(recipient.trim())) {
-                    client.sendMessage("(Group) " + senderNickname + ": " + message);
-                    found = true;
-                }
-            }
-            if (!found) {
-                sendPrivateMessage(senderNickname, recipient.trim(), "User not found in group message.");
-            }
-        }
-    }
-
-    public synchronized void broadcastMessageExcluding(String senderNickname, String[] exclusions, String message) {
-        List<String> excludedList = Arrays.asList(exclusions);
-        for (ClientHandler client : connectedClients) {
-            if (!excludedList.contains(client.nickname)) {
-                client.sendMessage("(Excluded) " + senderNickname + ": " + message);
-            }
-        }
-    }
+}
 
     /*private synchronized void logMessage(String message, String sender, boolean isBroadcast) {
         try {
@@ -237,4 +229,3 @@ public class Server {
             System.err.println("Error writing to log file: " + e.getMessage());
         }
     }*/
-}

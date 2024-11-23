@@ -23,7 +23,6 @@ public class ClientHandler implements Runnable {
     @Override
     public void run() {
         try {
-            // Handle nickname setup
             while (true) {
                 nickname = in.readLine();
                 if (nickname == null || nickname.isBlank()) {
@@ -31,25 +30,25 @@ public class ClientHandler implements Runnable {
                 } else if (server.isNicknameTaken(nickname)) {
                     out.println("Nickname already taken. Please choose a different nickname:");
                 } else {
-                    server.addClient(this); // Register client with the server
+                    server.addClient(this);
                     break;
                 }
             }
 
-            // Main message-handling loop
             String message;
+            //message handler loop
             while ((message = in.readLine()) != null) {
                 if (isInBannedPhrases(message)) {
                     out.println("Your message contains a banned phrase and was not sent.");
-                    continue; // Skip further processing
+                    continue;
                 }
 
                 if (message.startsWith("/clients")) {
-                    server.sendConnectedClients(this); // Send the updated client list
+                    server.sendConnectedClients(this);
                 } else if (message.startsWith("/banned")) {
-                    sendBannedPhrases(); // Send the list of banned phrases
-                } else if (message.startsWith("/msg ")) {
-                    handlePrivateMessage(message);
+                    sendBannedPhrases();
+                } else if (message.startsWith("/")) {
+                    handleUserListMessage(message); // Handle messages with specified users
                 } else {
                     server.broadcastMessage(nickname + ": " + message, this);
                 }
@@ -68,18 +67,26 @@ public class ClientHandler implements Runnable {
         sendMessage(bannedList);
     }
 
-    // Helper method to handle private messages
-    private void handlePrivateMessage(String message) {
-        String[] parts = message.split(" ", 3);
-        if (parts.length < 3) {
-            out.println("Usage: /msg <recipient> <message>");
+    private void handleUserListMessage(String message) {
+        // Expected format: /user1,user2,user3 <message>
+        String[] parts = message.substring(1).split(" ", 2); // Remove the leading '/' and split into recipients and message
+        if (parts.length < 2) {
+            out.println("Usage: /user1,user2,... <message>");
             return;
         }
 
-        String recipientNickname = parts[1];
-        String privateMessage = parts[2];
+        String recipientsStr = parts[0]; // e.g., "user1,user2,user3"
+        String actualMessage = parts[1];
 
-        server.sendPrivateMessage(nickname, recipientNickname, privateMessage);
+        String[] targetUsers = recipientsStr.split(","); // Split recipients by comma
+
+        // Trim whitespace from usernames
+        for (int i = 0; i < targetUsers.length; i++) {
+            targetUsers[i] = targetUsers[i].trim();
+        }
+
+        // Pass the recipients and the message to the server
+        server.sendToMultipleClients(nickname, targetUsers, actualMessage);
     }
 
     // Check for banned phrases

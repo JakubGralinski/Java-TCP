@@ -61,6 +61,6 @@ public class ServerGUI {
         Server server = new Server();
         ServerGUI serverGUI = new ServerGUI(server);
 
-        server.setGui(serverGUI); // Add a reference to update GUI from server logic
+        server.setGui(serverGUI); // Set the GUI reference in the server to enable logging
     }
 }

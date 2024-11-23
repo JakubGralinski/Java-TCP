@@ -1,3 +1,4 @@
+/*
 import java.io.*;
 import java.net.Socket;
 
@@ -42,4 +43,4 @@ public class Client {
             System.err.println("Error connecting to the server: " + e.getMessage());
         }
     }
-}
+}*/
