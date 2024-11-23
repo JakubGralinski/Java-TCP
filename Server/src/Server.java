@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class Server {
@@ -19,31 +18,29 @@ public class Server {
 
     private ServerGUI gui;
 
-    public static final String configFilePath = "src/config.json";
+    //public static final String configFilePath = "src/config.json";
 
-    // Log buffer for messages before GUI is initialized
-    private List<String> logBuffer = new ArrayList<>();
+    private List<String> serverLogs = new ArrayList<>();
 
     public synchronized void setGui(ServerGUI gui) {
         this.gui = gui;
-        // Flush any buffered log messages to the GUI
-        for (String message : logBuffer) {
+        for (String message : serverLogs) {
             gui.appendLog(message);
         }
-        logBuffer.clear();
+        serverLogs.clear();
     }
 
-    // Unified log method
     public synchronized void log(String message) {
         System.out.println(message);
         if (gui != null) {
             gui.appendLog(message);
         } else {
-            logBuffer.add(message);
+            serverLogs.add(message);
         }
     }
 
     public Server() throws IOException {
+        String configFilePath = "src/config.json";
         try (FileReader configLoader = new FileReader(configFilePath)) {
             JSONTokener tokener = new JSONTokener(configLoader);
             JSONObject config = new JSONObject(tokener);
@@ -64,6 +61,7 @@ public class Server {
     }
 
     public void run() {
+        String configFilePath = "src/config.json";
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             log(serverName + " running on port: " + port);
 
@@ -148,7 +146,6 @@ public class Server {
                 }
             }
 
-            // Notify the sender if a recipient was not found
             if (!found) {
                 for (ClientHandler client : connectedClients) {
                     if (client.nickname.equalsIgnoreCase(senderNickname)) {
@@ -160,7 +157,7 @@ public class Server {
         }
 
         if (atLeastOneFound) {
-            // Notify the sender about successful message delivery
+            //Notify about mess delivery
             for (ClientHandler client : connectedClients) {
                 if (client.nickname.equalsIgnoreCase(senderNickname)) {
                     client.sendMessage("[Private] Message sent to: " + String.join(", ", targetUsers));
@@ -175,8 +172,8 @@ public class Server {
         for (ClientHandler client : connectedClients) {
             clientList.append(client.nickname).append(", ");
         }
-        if (clientList.length() > 19) { // Length of "Connected clients: "
-            clientList.setLength(clientList.length() - 2); // Remove trailing ", "
+        if (clientList.length() > 19) {
+            clientList.setLength(clientList.length() - 2);
         } else {
             clientList.append("None");
         }

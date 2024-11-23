@@ -9,14 +9,13 @@ public class ClientGUI {
     private JTextArea chatArea;
     private JTextField messageField;
     private JButton sendButton, clientsButton, bannedButton;
-    private JList<String> recipientList; // List for recipients
+    private JList<String> recipientList;
     private DefaultListModel<String> recipientListModel;
 
     private PrintWriter out;
 
     public ClientGUI(Socket socket) {
         try {
-            // Initialize IO streams
             out = new PrintWriter(socket.getOutputStream(), true);
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
@@ -42,8 +41,6 @@ public class ClientGUI {
             recipientList.setVisibleRowCount(3);
             JScrollPane recipientScrollPane = new JScrollPane(recipientList);
             recipientScrollPane.setPreferredSize(new Dimension(150, 80));
-
-            // Add "All" option to the recipient list
             recipientListModel.addElement("All");
 
             // Command buttons
@@ -55,7 +52,7 @@ public class ClientGUI {
 
             // Layout setup
             JPanel inputPanel = new JPanel(new BorderLayout());
-            inputPanel.add(recipientScrollPane, BorderLayout.WEST); // Add recipient list
+            inputPanel.add(recipientScrollPane, BorderLayout.WEST);
             inputPanel.add(messageField, BorderLayout.CENTER);
             inputPanel.add(sendButton, BorderLayout.EAST);
 
@@ -67,17 +64,15 @@ public class ClientGUI {
             frame.getContentPane().add(inputPanel, BorderLayout.SOUTH);
             frame.getContentPane().add(buttonPanel, BorderLayout.NORTH);
 
-            // Show the GUI
             frame.setVisible(true);
 
-            // Start a thread to read messages from the server
             new Thread(() -> {
                 try {
                     String serverMessage;
                     while ((serverMessage = in.readLine()) != null) {
                         appendMessage(serverMessage);
 
-                        // Update the recipient list when a client list update is received
+                        // recipent list gets client list
                         if (serverMessage.startsWith("Connected clients: ")) {
                             updateRecipientList(serverMessage);
                         }
@@ -95,17 +90,16 @@ public class ClientGUI {
     private void sendMessage() {
         String message = messageField.getText().trim();
         if (!message.isEmpty()) {
-            // Get selected recipients
             List<String> selectedRecipients = recipientList.getSelectedValuesList();
             if (selectedRecipients.isEmpty() || selectedRecipients.contains("All")) {
-                // Broadcast if "All" is selected or no recipient is selected
+                //if "All" is selected or no recipient is selected
                 out.println(message);
+                appendMessage("You (to All): " + message);
             } else {
-                // Build the recipient string
                 String recipientsStr = String.join(",", selectedRecipients);
 
-                // Send to specific users
                 out.println("/" + recipientsStr + " " + message);
+                appendMessage("You (to " + recipientsStr + "): " + message);
             }
             messageField.setText(""); // Clear the input field
         }
@@ -119,7 +113,7 @@ public class ClientGUI {
         chatArea.append(message + "\n");
 
         if (message.startsWith("Connected clients: ")) {
-            updateRecipientList(message); // Update recipient list
+            updateRecipientList(message);
         } else if (message.startsWith("Banned phrases: ")) {
             JOptionPane.showMessageDialog(frame, message, "Banned Phrases", JOptionPane.INFORMATION_MESSAGE);
         }
@@ -140,7 +134,7 @@ public class ClientGUI {
                 }
             }
 
-            // Re-select previously selected item if it exists
+            // Reselect selected before item if it exists
             if (previouslySelected != null && recipientListModel.contains(previouslySelected)) {
                 recipientList.setSelectedValue(previouslySelected, true);
             }

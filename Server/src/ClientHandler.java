@@ -1,3 +1,4 @@
+import javax.sound.sampled.Port;
 import java.io.*;
 import java.net.Socket;
 
@@ -6,11 +7,13 @@ public class ClientHandler implements Runnable {
     private Server server;
     private PrintWriter out;
     private BufferedReader in;
+    private int port;
     String nickname;
 
     public ClientHandler(Socket clientSocket, Server server) {
         this.clientSocket = clientSocket;
         this.server = server;
+        this.port = clientSocket.getPort();
         try {
             this.out = new PrintWriter(clientSocket.getOutputStream(), true);
             this.in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
@@ -31,6 +34,7 @@ public class ClientHandler implements Runnable {
                     out.println("Nickname already taken. Please choose a different nickname:");
                 } else {
                     server.addClient(this);
+                    sendInstructions();
                     break;
                 }
             }
@@ -43,9 +47,9 @@ public class ClientHandler implements Runnable {
                     continue;
                 }
 
-                if (message.startsWith("/clients")) {
+                if (message.startsWith("/clients")) {//command from client list button
                     server.sendConnectedClients(this);
-                } else if (message.startsWith("/banned")) {
+                } else if (message.startsWith("/banned")) {//command from banned phrases button
                     sendBannedPhrases();
                 } else if (message.startsWith("/")) {
                     handleUserListMessage(message); // Handle messages with specified users
@@ -61,6 +65,15 @@ public class ClientHandler implements Runnable {
             closeConnection();
         }
     }
+    private void sendInstructions() {
+        String instructions = "Instructions:\n" +
+                "- To send a message to all: Simply type your message and press Send.\n" +
+                "- To send a message to specific user: Select the user from the list and type your message.\n" +
+                "- To send a message to everyone except certain users: Select users without the one u want to avoid.\n" +
+                "- To see the list of banned phrases:  click Banned Phrases button.\n"+
+                "- To see the list of connected Clients: click List Clients button";
+        sendMessage(instructions);
+    }
 
     private void sendBannedPhrases() {
         String bannedList = "Banned phrases: " + String.join(", ", server.getBannedPhrases());
@@ -68,17 +81,13 @@ public class ClientHandler implements Runnable {
     }
 
     private void handleUserListMessage(String message) {
-        // Expected format: /user1,user2,user3 <message>
+        // /user1,user2,user3 <message>
         String[] parts = message.substring(1).split(" ", 2); // Remove the leading '/' and split into recipients and message
-        if (parts.length < 2) {
-            out.println("Usage: /user1,user2,... <message>");
-            return;
-        }
 
-        String recipientsStr = parts[0]; // e.g., "user1,user2,user3"
+        String recipientsStr = parts[0];
         String actualMessage = parts[1];
 
-        String[] targetUsers = recipientsStr.split(","); // Split recipients by comma
+        String[] targetUsers = recipientsStr.split(",");
 
         // Trim whitespace from usernames
         for (int i = 0; i < targetUsers.length; i++) {
@@ -89,7 +98,6 @@ public class ClientHandler implements Runnable {
         server.sendToMultipleClients(nickname, targetUsers, actualMessage);
     }
 
-    // Check for banned phrases
     private boolean isInBannedPhrases(String message) {
         for (String phrase : server.getBannedPhrases()) {
             if (message.toLowerCase().contains(phrase.toLowerCase())) {
@@ -99,12 +107,10 @@ public class ClientHandler implements Runnable {
         return false;
     }
 
-    // Send a message to this client
     public void sendMessage(String message) {
         out.println(message);
     }
 
-    // Close client socket
     private void closeConnection() {
         try {
             clientSocket.close();

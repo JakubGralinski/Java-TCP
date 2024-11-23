@@ -31,10 +31,8 @@ public class ServerGUI {
 
         frame.getContentPane().add(splitPane);
 
-        // Show the GUI
         frame.setVisible(true);
 
-        // Start the server in a new thread
         new Thread(() -> {
             try {
                 server.run();
@@ -61,6 +59,6 @@ public class ServerGUI {
         Server server = new Server();
         ServerGUI serverGUI = new ServerGUI(server);
 
-        server.setGui(serverGUI); // Set the GUI reference in the server to enable logging
+        server.setGui(serverGUI);
     }
 }
