@@ -19,22 +19,19 @@ public class MultiSelectComboBox extends JComboBox<Object> {
         setModel(model);
 
         setRenderer(new CheckBoxRenderer());
-        addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (getSelectedIndex() == 0) { // "All" selected
-                    selectedItems.clear();
-                    selectedItems.add("All");
+        addActionListener(e -> {
+            if (getSelectedIndex() == 0) { // "All" selected
+                selectedItems.clear();
+                selectedItems.add("All");
+            } else {
+                Object selected = getSelectedItem();
+                if (selectedItems.contains(selected)) {
+                    selectedItems.remove(selected); // Uncheck
                 } else {
-                    Object selected = getSelectedItem();
-                    if (selectedItems.contains(selected)) {
-                        selectedItems.remove(selected); // Uncheck
-                    } else {
-                        selectedItems.add((String) selected); // Check
-                    }
+                    selectedItems.add((String) selected); // Check
                 }
-                updateModel();
             }
+            updateModel();
         });
     }
 
